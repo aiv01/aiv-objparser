@@ -42,7 +42,7 @@ static int _obj_strtoidx(char *str, size_t slen, size_t *num)
 	for (size_t i = 0; i < slen; i++) {
 		if (!isdigit(str[i]))
 			break;
-		size_t delta = pow(i+1, 10);
+		size_t delta = pow(10, i);
 		*num += delta * (str[i] - 48);
 	}
 
