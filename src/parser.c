@@ -69,21 +69,26 @@ int obj_parse_uv(char *line, size_t slen, obj_uv_t *uv)
 	return field_index == 2 ? 0 : -1;
 }
 
-
-
 static int _obj_strtoidx(char *str, size_t slen, size_t *num)
 {
 	*num = 0;
-
-	for (size_t i = 0; i < slen; i++) {
+	size_t counter = 0;
+	for (int i = 0; i < slen; i++) {
 		if (!isdigit(str[i]))
 			break;
-		size_t delta = pow(10, i);
+		counter++;
+	}
+
+	for (int i = 0; i < counter; i++) {
+		if (!isdigit(str[i]))
+			break;
+		size_t delta = pow(10, counter-1-i);
 		*num += delta * (str[i] - 48);
 	}
 
 	return 0;
 }
+
 
 // zero-copy slash splitter to index (size_t)
 int obj_parse_vertex(char *line, size_t slen, obj_vertex_t *v)
