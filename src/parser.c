@@ -5,9 +5,9 @@ int obj_parse_v3(char *line, size_t slen, obj_v3_t *v3)
 {
 	// get pointers to struct members
 	float *vfields[3];
-	vfields[0] = (float *)((void *)v3 + offsetof(obj_v3_t, x));
-	vfields[1] = (float *)((void *)v3 + offsetof(obj_v3_t, y));
-	vfields[2] = (float *)((void *)v3 + offsetof(obj_v3_t, z));
+	vfields[0] = &v3->x;
+	vfields[1] = &v3->y;
+	vfields[2] = &v3->z;
 
 	size_t field_index = 0;
 
@@ -35,6 +35,42 @@ int obj_parse_v3(char *line, size_t slen, obj_v3_t *v3)
 	return field_index == 3 ? 0 : -1;
 }
 
+// zero-copy space splitter to float (uv variant)
+int obj_parse_uv(char *line, size_t slen, obj_uv_t *uv)
+{
+	// get pointers to struct members
+	float *vfields[2];
+	vfields[0] = &uv->u;
+	vfields[1] = &uv->v;
+
+	size_t field_index = 0;
+
+	// ptr always points to the current split-part
+	char *ptr = line;
+	for(size_t i=0;i<slen;i++)
+	{
+		if (isspace(line[i]) || i+1 == slen)
+		{
+			// strtof will set errno accordingly
+			errno = 0;
+			char *next_ptr = NULL;
+			*vfields[field_index++] = strtof(ptr, &next_ptr);
+			if (errno != 0 || ptr == next_ptr)
+				return -1;
+
+			ptr = next_ptr;
+
+			// we have z !
+			if (field_index > 1)
+				break;
+		}
+	}
+
+	return field_index == 2 ? 0 : -1;
+}
+
+
+
 static int _obj_strtoidx(char *str, size_t slen, size_t *num)
 {
 	*num = 0;
@@ -54,9 +90,9 @@ int obj_parse_vertex(char *line, size_t slen, obj_vertex_t *v)
 {
 	// get pointers to struct members
 	size_t *vfields[3];
-	vfields[0] = (size_t *)((void *)v + offsetof(obj_vertex_t, v_idx));
-	vfields[1] = (size_t *)((void *)v + offsetof(obj_vertex_t, vt_idx));
-	vfields[2] = (size_t *)((void *)v + offsetof(obj_vertex_t, vn_idx));
+	vfields[0] = &v->v_idx;
+	vfields[1] = &v->vt_idx;
+	vfields[2] = &v->vn_idx;
 
 	size_t field_index = 0;
 
@@ -114,6 +150,11 @@ static obj_v3_t *_obj_increase_memory_for_v3(obj_v3_t *ptr, size_t items)
 	return (obj_v3_t *) realloc(ptr, items * (sizeof(obj_v3_t) + 1));
 }
 
+static obj_uv_t *_obj_increase_memory_for_uv(obj_uv_t *ptr, size_t items)
+{
+	return (obj_uv_t *) realloc(ptr, items * (sizeof(obj_uv_t) + 1));
+}
+
 static obj_face_t *_obj_increase_memory_for_face(obj_face_t *ptr, size_t items)
 {
 	return (obj_face_t *) realloc(ptr, items * (sizeof(obj_face_t) + 1));
@@ -154,6 +195,20 @@ int obj_parse_line(char *line, size_t slen, obj_ctx_t *ctx)
 
 	if (slen < 3)
 		return 0;
+
+	if (line[0] == 'v' && line[1] == 't' && line[2] == ' ')
+	{
+		ctx->vt_cnt++;
+		obj_uv_t *new_chunk = _obj_increase_memory_for_uv(ctx->vt, ctx->vt_cnt);
+		if (!new_chunk)
+			return -1;
+		ctx->vt = new_chunk;
+		if (obj_parse_uv(line + 3, slen - 3, &ctx->vt[ctx->vt_cnt-1]))
+		{
+			return -1;
+		}
+		return 0;
+	}
 
 	if (line[0] == 'v' && line[1] == 'n' && line[2] == ' ')
 	{
